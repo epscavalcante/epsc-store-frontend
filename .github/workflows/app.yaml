@@ -40,7 +40,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build
-        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          if [ -z "$VITE_API_URL" ]; then
+            echo "::error::Configure a variável VITE_API_URL no repositório ou no environment github-pages."
+            exit 1
+          fi
+          npm run build
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact

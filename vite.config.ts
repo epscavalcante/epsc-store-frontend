@@ -9,16 +9,21 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [
-      vue(),
-      vueDevTools(),
-      tailwindcss(),
-    ],
+    plugins: [vue(), vueDevTools(), tailwindcss()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
     base: env.VITE_BASE_URL || '/',
+    server: {
+      proxy: {
+        '/api': {
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:8000',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
+      },
+    },
   }
 })

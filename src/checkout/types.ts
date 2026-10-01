@@ -1,9 +1,9 @@
-export type PaymentMethod = 'pix' | 'bankslip' | 'credit_card'
-export type CheckoutStatus = 'success' | 'error' | 'pending'
+export type PaymentMethod = 'pix' | 'bankslip'
+export type CheckoutStatus = 'success' | 'error' | 'pending' | 'expired' | 'cancelled' | 'unknown'
 
 // Prices are represented in cents in the UI to avoid rounding errors.
 export interface Product {
-  id: number
+  id: string
   name: string
   description: string
   price: number
@@ -15,23 +15,33 @@ export interface CartItem {
 }
 export interface CheckoutRequest {
   payment_method: PaymentMethod
-  items: { product_id: number; quantity: number }[]
+  items: { product_id: string; quantity: number }[]
   customer?: { name: string; tax_id: string }
 }
 export interface CheckoutResult {
   id: string
   status: CheckoutStatus
-  items: { product_id: number; quantity: number }[]
+  rawStatus: string
+  cart: CartItem[]
   total: number
-  payment_method: PaymentMethod
+  payments: CheckoutPayment[]
+}
+export interface CheckoutPayment {
+  id: string
+  status: CheckoutStatus
+  rawStatus: string
+  method: string
+  total: number
+  expiresAt: number | null
+  pixCode: string | null
+  pixImage: string | null
+  bankslipCode: string | null
+  bankslipUrl: string | null
+  createdAt: number | null
 }
 export interface PaymentFields {
   name: string
   taxId: string
-  number: string
-  holder: string
-  expiry: string
-  securityCode: string
 }
 export type FieldErrors = Partial<Record<keyof PaymentFields, string>>
 export const currency = (cents: number) =>
