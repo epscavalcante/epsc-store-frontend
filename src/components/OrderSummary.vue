@@ -10,7 +10,7 @@ const props = defineProps<{
   disabled?: boolean
   readonly?: boolean
 }>()
-defineEmits<{ quantity: [productId: number, change: number]; remove: [productId: number] }>()
+defineEmits<{ quantity: [productId: string, change: number]; remove: [productId: string] }>()
 const assetBase = import.meta.env.BASE_URL
 const itemCount = computed(() => props.items.reduce((count, item) => count + item.quantity, 0))
 const total = computed(() => props.total ?? cartTotal(props.items))
@@ -109,7 +109,7 @@ const total = computed(() => props.total ?? cartTotal(props.items))
     <p
       class="mt-[34px] flex items-start gap-2 text-[10px] leading-[1.7] text-subtle [&_svg]:shrink-0"
     >
-      <StoreIcon name="bag" :size="17" /> Produtos da sua compra de teste.
+      <StoreIcon name="bag" :size="17" /> Produtos do seu pedido.
     </p>
   </aside>
 </template>

@@ -28,7 +28,7 @@ const cartStore = useCartStore()
         >
         <span
           class="rounded-[3px] border border-stroke px-[9px] py-1 text-[11px] text-[#b8c0c8] max-narrow:px-1.5 max-narrow:text-[10px]"
-          >Modo demonstração</span
+          >Loja online</span
         >
       </div>
       <RouterLink

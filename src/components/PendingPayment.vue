@@ -1,189 +1,140 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { PaymentMethod } from '@/checkout/types'
+import type { CheckoutPayment } from '@/checkout/types'
 import StoreIcon from './StoreIcon.vue'
 
-const props = defineProps<{ method: PaymentMethod; expiresAt: number; dueAt: number }>()
-const assetBase = import.meta.env.BASE_URL
-// Deliberately non-payable examples. The QR encodes this same demonstration text.
-const pixCode = 'DEMO-EPSC-STORE-PIX-SEM-VALOR-NAO-PAGAR'
-const boletoCode = '00000.00000 00000.000000 00000.000000 0 00000000000000'
-const dueDate = computed(() => new Date(props.dueAt).toLocaleDateString('pt-BR'))
+const props = defineProps<{ payment: CheckoutPayment }>()
 const now = ref(Date.now())
-const remaining = computed(() => Math.max(0, Math.ceil((props.expiresAt - now.value) / 1000)))
-const copied = ref<'pix' | 'boleto' | null>(null)
-const copyError = ref('')
-const timeLeft = computed(
-  () =>
-    `${String(Math.floor(remaining.value / 60)).padStart(2, '0')}:${String(remaining.value % 60).padStart(2, '0')}`,
+const remaining = computed(() =>
+  props.payment.expiresAt === null
+    ? null
+    : Math.max(0, Math.ceil((props.payment.expiresAt - now.value) / 1000)),
 )
-let interval: ReturnType<typeof setInterval> | undefined
-let feedbackTimeout: ReturnType<typeof setTimeout> | undefined
+const expired = computed(() => remaining.value === 0 || props.payment.status === 'expired')
+const unavailable = computed(() => expired.value || props.payment.status !== 'pending')
+const timeLeft = computed(() => {
+  const seconds = remaining.value ?? 0
+  const hours = Math.floor(seconds / 3600)
+  return `${hours ? `${hours}:` : ''}${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+})
+const expiryDate = computed(() =>
+  props.payment.expiresAt === null ? '' : new Date(props.payment.expiresAt).toLocaleString('pt-BR'),
+)
+const code = computed(() =>
+  props.payment.method === 'pix' ? props.payment.pixCode : props.payment.bankslipCode,
+)
+const safeBoletoUrl = computed(() => {
+  try {
+    const url = new URL(props.payment.bankslipUrl ?? '')
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : null
+  } catch {
+    return null
+  }
+})
+const feedback = ref('')
+const imageFailed = ref(false)
+let timer: ReturnType<typeof setInterval> | undefined
+let feedbackTimer: ReturnType<typeof setTimeout> | undefined
 onMounted(() => {
-  interval = setInterval(() => {
+  timer = setInterval(() => {
     now.value = Date.now()
-    if (!remaining.value) clearInterval(interval)
   }, 1000)
 })
 onUnmounted(() => {
-  clearInterval(interval)
-  clearTimeout(feedbackTimeout)
+  clearInterval(timer)
+  clearTimeout(feedbackTimer)
 })
-async function copyCode(kind: 'pix' | 'boleto') {
-  copied.value = null
-  copyError.value = ''
-  clearTimeout(feedbackTimeout)
+async function copyCode() {
+  if (!code.value || unavailable.value) return
   try {
-    await navigator.clipboard.writeText(kind === 'pix' ? pixCode : boletoCode)
-    copied.value = kind
-    feedbackTimeout = setTimeout(() => {
-      copied.value = null
-    }, 3000)
+    await navigator.clipboard.writeText(code.value)
+    feedback.value = 'Código copiado.'
   } catch {
-    copyError.value =
-      'Não foi possível copiar automaticamente. Selecione o código acima e copie manualmente.'
+    feedback.value = 'Selecione os números acima e copie manualmente.'
   }
+  clearTimeout(feedbackTimer)
+  feedbackTimer = setTimeout(() => {
+    feedback.value = ''
+  }, 3000)
 }
 </script>
 
 <template>
-  <div class="mb-[26px]">
-    <div v-if="method === 'bankslip'">
-      <div class="flex items-center justify-between gap-3">
-        <h3 class="text-sm font-semibold">Seu boleto de exemplo</h3>
-        <span
-          class="rounded border border-[#4c565d] px-[7px] py-[3px] text-[9px] font-medium text-muted"
-          >Simulado</span
-        >
-      </div>
-      <p class="mt-[9px] mb-4 text-xs leading-[1.75] text-muted">
-        Linha digitável e código de barras ilustrativos para experimentar o fluxo.
-      </p>
+  <section class="mb-6 rounded-md border border-stroke p-4">
+    <h2 class="text-sm font-semibold">
+      {{
+        payment.method === 'pix'
+          ? 'Pagamento com Pix'
+          : payment.method === 'bankslip'
+            ? 'Pagamento com boleto'
+            : 'Pagamento'
+      }}
+    </h2>
+    <p v-if="unavailable" class="mt-3 text-xs text-pending">
+      {{
+        expired
+          ? 'O prazo deste pagamento expirou. Atualize o pedido para consultar a situação atual.'
+          : `Status do pagamento: ${payment.rawStatus}.`
+      }}
+    </p>
+    <template v-if="payment.method === 'pix'">
       <div
-        class="my-[18px] rounded-md bg-white px-2.5 py-[14px] [&_img]:block [&_img]:h-16 [&_img]:w-full"
+        v-if="payment.pixImage && !imageFailed"
+        class="mx-auto my-5 w-[196px] rounded-lg bg-white p-3"
+        :class="{ 'opacity-30': unavailable }"
       >
         <img
-          :src="`${assetBase}payments/boleto-barcode.svg`"
-          alt="Código de barras ilustrativo, sem validade para pagamento"
-          width="320"
-          height="64"
+          :src="payment.pixImage"
+          alt="QR Code do pagamento Pix"
+          width="172"
+          height="172"
+          class="size-[172px]"
+          @error="imageFailed = true"
         />
       </div>
-      <label class="mb-[7px] block text-xs font-medium" for="boleto-copy-code"
-        >Linha digitável</label
+      <p v-else class="mt-3 text-xs text-muted">
+        QR Code indisponível. Use o código copia e cola, se disponível.
+      </p>
+      <p
+        v-if="remaining !== null && !expired"
+        class="my-4 flex items-center justify-center gap-2 text-xs text-pending tabular-nums"
       >
+        <StoreIcon name="clock" :size="15" />Expira em {{ timeLeft }}
+      </p>
+    </template>
+    <p v-if="expiryDate" class="my-3 text-xs text-muted">
+      {{ payment.method === 'bankslip' ? 'Vencimento' : 'Validade' }}: {{ expiryDate }}
+    </p>
+    <template v-if="code">
+      <label :for="`payment-code-${payment.id}`" class="mt-4 mb-2 block text-xs">
+        {{ payment.method === 'pix' ? 'Pix copia e cola' : 'Código do boleto' }}
+      </label>
       <textarea
-        id="boleto-copy-code"
-        class="mb-2.5 block w-full resize-none rounded-field border border-stroke-input bg-inset p-3 font-mono text-[11px] leading-[1.7] text-[#dce2e7] [overflow-wrap:anywhere]"
-        :value="boletoCode"
+        :id="`payment-code-${payment.id}`"
+        :value="code"
         readonly
-        rows="2"
+        rows="3"
         spellcheck="false"
+        class="block w-full resize-none rounded-field border border-stroke-input bg-inset p-3 font-mono text-[11px] leading-relaxed text-action [overflow-wrap:anywhere]"
       />
       <button
         type="button"
-        class="flex min-h-[42px] w-full items-center justify-center gap-[9px] rounded-field border border-[#59636b] bg-copy px-[14px] py-2.5 text-xs text-[#e5ebef] enabled:hover:bg-copy-hover disabled:opacity-50"
-        @click="copyCode('boleto')"
+        :disabled="unavailable"
+        class="mt-3 flex w-full items-center justify-center gap-2 rounded-field border border-stroke-input bg-copy px-4 py-3 text-xs hover:bg-copy-hover disabled:opacity-50"
+        @click="copyCode"
       >
-        <StoreIcon :name="copied === 'boleto' ? 'check' : 'barcode'" :size="16" />{{
-          copied === 'boleto' ? 'Linha digitável copiada' : 'Copiar linha digitável'
-        }}
+        <StoreIcon :name="payment.method === 'pix' ? 'pix' : 'barcode'" :size="16" />Copiar código
       </button>
-      <div
-        class="mt-[14px] mb-[23px] flex flex-col gap-3 text-[11px] text-muted [&_strong]:font-medium [&_strong]:text-[#dce2e7] [&_a]:w-fit [&_a]:text-[#e0e7ed] [&_a]:underline [&_a]:underline-offset-4"
-      >
-        <span
-          >Vencimento de exemplo: <strong>{{ dueDate }}</strong></span
-        ><a :href="`${assetBase}payments/boleto-demo.pdf`" target="_blank" rel="noopener noreferrer"
-          >Abrir PDF de exemplo ↗</a
-        >
-      </div>
-    </div>
-
-    <component
-      :is="method === 'bankslip' ? 'details' : 'div'"
-      v-if="method !== 'credit_card'"
-      :class="method === 'bankslip' ? 'group rounded-md border border-[#3b454b] bg-[#24292b]' : ''"
+    </template>
+    <p v-else class="mt-4 text-xs text-muted">Código de pagamento ainda não disponível.</p>
+    <a
+      v-if="payment.method === 'bankslip' && safeBoletoUrl && !unavailable"
+      :href="safeBoletoUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="mt-4 block text-xs underline underline-offset-4"
+      >Abrir boleto ↗</a
     >
-      <summary
-        class="flex items-center gap-2 p-[14px] text-xs text-[#d1dbe0] after:ml-auto after:text-[17px] after:content-['+'] group-open:border-b group-open:border-[#3b454b] group-open:after:content-['−']"
-        v-if="method === 'bankslip'"
-      >
-        <StoreIcon name="pix" :size="18" /> Prefere Pix? Veja a opção de exemplo
-      </summary>
-      <div :class="{ 'px-[14px] py-[18px]': method === 'bankslip' }">
-        <div class="flex items-center justify-between gap-3">
-          <h3 class="text-sm font-semibold">
-            {{ method === 'bankslip' ? 'Pix opcional' : 'Pague com Pix' }}
-          </h3>
-          <span
-            class="rounded border border-[#4c565d] px-[7px] py-[3px] text-[9px] font-medium text-muted"
-            >Simulado</span
-          >
-        </div>
-        <p class="mt-[9px] mb-4 text-xs leading-[1.75] text-muted">
-          Exemplo de QR Code e copia e cola. O QR contém apenas um texto de demonstração.
-        </p>
-        <div
-          class="relative mx-auto mt-[19px] mb-3 w-[196px] rounded-lg bg-white p-3 [&_img]:block [&_img]:size-[172px]"
-          :class="{ '[&_img]:opacity-[.12]': !remaining }"
-        >
-          <img
-            :src="`${assetBase}payments/pix-demo.svg`"
-            alt="QR Code de demonstração, sem valor para pagamento"
-            width="172"
-            height="172"
-          /><span
-            v-if="!remaining"
-            class="absolute inset-0 grid place-items-center text-[13px] font-semibold text-panel"
-            >Exemplo expirado</span
-          >
-        </div>
-        <p
-          class="mb-[23px] flex items-center justify-center gap-[7px] text-xs tabular-nums"
-          :class="remaining ? 'text-[#d5c59c]' : 'text-danger'"
-        >
-          <StoreIcon name="clock" :size="15" />{{
-            remaining ? `Expira em ${timeLeft}` : 'Prazo da simulação encerrado'
-          }}
-        </p>
-        <label class="mb-[7px] block text-xs font-medium" for="pix-copy-code"
-          >Pix copia e cola de exemplo</label
-        >
-        <textarea
-          id="pix-copy-code"
-          class="mb-2.5 block w-full resize-none rounded-field border border-stroke-input bg-inset p-3 font-mono text-[11px] leading-[1.7] text-[#dce2e7] [overflow-wrap:anywhere]"
-          :value="pixCode"
-          readonly
-          rows="2"
-          spellcheck="false"
-        />
-        <button
-          type="button"
-          class="flex min-h-[42px] w-full items-center justify-center gap-[9px] rounded-field border border-[#59636b] bg-copy px-[14px] py-2.5 text-xs text-[#e5ebef] enabled:hover:bg-copy-hover disabled:opacity-50"
-          :disabled="!remaining"
-          @click="copyCode('pix')"
-        >
-          <StoreIcon :name="copied === 'pix' ? 'check' : 'pix'" :size="16" />{{
-            copied === 'pix' ? 'Código Pix copiado' : 'Copiar código Pix'
-          }}
-        </button>
-        <p v-if="!remaining" class="mt-[9px] mb-4 text-xs leading-[1.75] text-muted">
-          Inicie uma nova compra de teste para gerar outro prazo.
-        </p>
-      </div>
-    </component>
-    <p v-else class="mt-[9px] mb-4 text-xs leading-[1.75] text-muted">
-      Aguardando processamento simulado do cartão.
-    </p>
-    <p role="status" class="mt-2.5 text-[11px] leading-[1.6] text-success empty:hidden">
-      {{ copyError || (copied ? 'Copiado para a área de transferência.' : '') }}
-    </p>
-    <p
-      class="mt-[19px] flex items-start gap-2 border-t border-stroke pt-[17px] text-[10px] leading-[1.8] text-subtle [&_svg]:mt-0.5 [&_svg]:shrink-0"
-    >
-      <StoreIcon name="lock" :size="15" /> QR Code, linha digitável e PDF são demonstrativos. Não
-      realize pagamentos. O pedido permanece pendente.
-    </p>
-  </div>
+    <p role="status" class="mt-3 text-xs text-success empty:hidden">{{ feedback }}</p>
+  </section>
 </template>
