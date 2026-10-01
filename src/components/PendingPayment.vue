@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { CheckoutPayment } from '@/checkout/types'
 import StoreIcon from './StoreIcon.vue'
+import BoletoBarcode from './BoletoBarcode.vue'
 
 const props = defineProps<{ payment: CheckoutPayment }>()
 const now = ref(Date.now())
@@ -106,17 +107,26 @@ async function copyCode() {
       {{ payment.method === 'bankslip' ? 'Vencimento' : 'Validade' }}: {{ expiryDate }}
     </p>
     <template v-if="code">
-      <label :for="`payment-code-${payment.id}`" class="mt-4 mb-2 block text-xs">
-        {{ payment.method === 'pix' ? 'Pix copia e cola' : 'Código do boleto' }}
-      </label>
-      <textarea
-        :id="`payment-code-${payment.id}`"
+      <BoletoBarcode
+        v-if="payment.method === 'bankslip' && !unavailable"
         :value="code"
-        readonly
-        rows="3"
-        spellcheck="false"
-        class="block w-full resize-none rounded-field border border-stroke-input bg-inset p-3 font-mono text-[11px] leading-relaxed text-action [overflow-wrap:anywhere]"
       />
+      <template v-if="payment.method === 'pix'">
+        <label :for="`payment-code-${payment.id}`" class="mt-4 mb-2 block text-xs">
+          Pix copia e cola
+        </label>
+        <textarea
+          :id="`payment-code-${payment.id}`"
+          :value="code"
+          readonly
+          rows="3"
+          spellcheck="false"
+          class="block w-full resize-none rounded-field border border-stroke-input bg-inset p-3 font-mono text-[11px] leading-relaxed text-action [overflow-wrap:anywhere]"
+        />
+      </template>
+      <p v-else-if="unavailable" class="mt-4 font-mono text-xs [overflow-wrap:anywhere]">
+        {{ code }}
+      </p>
       <button
         type="button"
         :disabled="unavailable"
