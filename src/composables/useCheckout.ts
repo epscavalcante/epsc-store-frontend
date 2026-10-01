@@ -1,4 +1,5 @@
 import { onUnmounted, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { ApiError } from '@/api/HttpClient'
 import { checkoutGatewayKey, injectRequired } from '@/config/injectionKeys'
 import { rememberOrder } from '@/checkout/orders'
@@ -25,7 +26,7 @@ export function useCheckout() {
         else schedule()
       }, 15000)
   }
-  async function load(id: string, { initial = true } = {}) {
+  async function load(id: string, { initial = true, notifyError = false } = {}) {
     if (disposed) return
     clearTimeout(timer)
     const current = ++version
@@ -51,6 +52,12 @@ export function useCheckout() {
         pollId = null
       }
       error.value = cause instanceof Error ? cause.message : 'Não foi possível consultar o pedido.'
+      if (notifyError) {
+        toast.error('Não foi possível atualizar o pedido.', {
+          id: `checkout-refresh-${id}`,
+          description: error.value,
+        })
+      }
     } finally {
       if (!disposed && current === version) {
         loading.value = false
@@ -82,6 +89,12 @@ export function useCheckout() {
           : cause instanceof Error
             ? cause.message
             : 'Não foi possível criar o pedido.'
+      if (!disposed) {
+        toast.error('Não foi possível finalizar o pedido.', {
+          id: 'checkout-create-error',
+          description: error.value,
+        })
+      }
       return null
     } finally {
       creating.value = false
@@ -92,7 +105,7 @@ export function useCheckout() {
     void load(id)
   }
   function refresh() {
-    if (pollId) return load(pollId, { initial: false })
+    if (pollId) return load(pollId, { initial: false, notifyError: true })
   }
   onUnmounted(() => {
     disposed = true

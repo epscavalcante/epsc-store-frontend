@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
+import { toast } from 'vue-sonner'
 import { useProductsStore } from '@/stores/products'
 import { useCartStore } from '@/stores/cart'
 import type { Product } from '@/checkout/types'
@@ -8,14 +9,33 @@ import StoreIcon from '@/components/StoreIcon.vue'
 
 const cartStore = useCartStore()
 const catalog = useProductsStore()
+const cartQuantities = computed(
+  () => new Map(cartStore.items.map((item) => [item.product.id, item.quantity])),
+)
 onMounted(() => {
   void catalog.load()
 })
-const feedback = ref('')
 function addProduct(product: Product) {
-  feedback.value = cartStore.addProduct(product)
-    ? `${product.name} adicionado ao carrinho. ${cartStore.itemCount} itens no total.`
-    : 'Não foi possível adicionar o produto. A quantidade máxima é 99.'
+  if (cartStore.locked) return
+  const previousQuantity = cartQuantities.value.get(product.id) ?? 0
+  const id = `cart-${product.id}`
+  if (!cartStore.addProduct(product)) {
+    toast.warning('Não foi possível adicionar o produto.', {
+      id,
+      description:
+        previousQuantity >= 99
+          ? 'A quantidade máxima deste produto é 99.'
+          : 'Atualize a lista de produtos e tente novamente.',
+    })
+    return
+  }
+  toast.success(
+    previousQuantity ? 'Quantidade atualizada no carrinho.' : 'Produto adicionado ao carrinho.',
+    {
+      id,
+      description: `${product.name} · ${previousQuantity + 1} ${previousQuantity ? 'unidades' : 'unidade'}.`,
+    },
+  )
 }
 const assetBase = import.meta.env.BASE_URL
 </script>
@@ -30,7 +50,6 @@ const assetBase = import.meta.env.BASE_URL
       </p>
     </div>
 
-    <p role="status" class="mb-4 text-xs text-success empty:hidden">{{ feedback }}</p>
     <p v-if="cartStore.persistenceError" role="status" class="mb-4 text-xs text-pending">
       {{ cartStore.persistenceError }}
     </p>

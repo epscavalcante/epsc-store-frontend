@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, toRefs } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { useCartStore } from '@/stores/cart'
 import { useProductsStore } from '@/stores/products'
 import { useCheckout } from '@/composables/useCheckout'
@@ -51,6 +52,18 @@ async function submit() {
     cartStore.clear()
     resetPaymentDraft()
     await router.push({ name: 'order', params: { id: result.id } })
+    if (result.status === 'pending') {
+      toast.info('Pedido criado. Falta realizar o pagamento.', {
+        id: `checkout-${result.id}`,
+        duration: 8000,
+        description:
+          paymentMethod === 'pix'
+            ? 'Escaneie o QR Code ou copie o código Pix para pagar antes do prazo de expiração.'
+            : 'Copie o código de barras ou abra o boleto para pagar até o vencimento.',
+      })
+    } else {
+      toast.success('Pedido criado.', { id: `checkout-${result.id}` })
+    }
   } finally {
     cartStore.locked = false
   }

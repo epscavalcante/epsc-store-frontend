@@ -3,12 +3,27 @@ import { RouterLink, RouterView } from 'vue-router'
 import StoreIcon from '@/components/StoreIcon.vue'
 import { useRoute } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
+import { Toaster } from 'vue-sonner'
+import 'vue-sonner/style.css'
 
 const route = useRoute()
 const cartStore = useCartStore()
 </script>
 
 <template>
+  <Toaster
+    theme="dark"
+    position="top-right"
+    close-button
+    :duration="4000"
+    container-aria-label="Notificações"
+    :toast-options="{ closeButtonAriaLabel: 'Fechar notificação' }"
+    :style="{
+      '--normal-bg': 'var(--color-panel)',
+      '--normal-text': 'var(--color-foreground)',
+      '--normal-border': 'var(--color-stroke)',
+    }"
+  />
   <div
     class="mx-auto my-12 max-w-[1000px] overflow-hidden rounded-shell border border-stroke-outer bg-surface max-wide:mx-6 max-wide:my-8 max-checkout:mx-auto max-checkout:my-5 max-checkout:max-w-[560px] max-compact:m-0 max-compact:min-h-dvh max-compact:rounded-none max-compact:border-0"
   >
