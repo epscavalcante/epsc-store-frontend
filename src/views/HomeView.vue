@@ -4,8 +4,7 @@ import { toast } from 'vue-sonner'
 import { useProductsStore } from '@/stores/products'
 import { useCartStore } from '@/stores/cart'
 import type { Product } from '@/checkout/types'
-import { currency } from '@/checkout/types'
-import StoreIcon from '@/components/StoreIcon.vue'
+import ProductCard from '@/components/ProductCard.vue'
 
 const cartStore = useCartStore()
 const catalog = useProductsStore()
@@ -37,7 +36,6 @@ function addProduct(product: Product) {
     },
   )
 }
-const assetBase = import.meta.env.BASE_URL
 </script>
 
 <template>
@@ -70,30 +68,15 @@ const assetBase = import.meta.env.BASE_URL
       Nenhum produto disponível no momento.
     </p>
     <div v-else class="flex flex-wrap justify-center gap-6">
-  <article v-for="product in catalog.items" :key="product.id" class="basis-[calc((100%_-_3rem)/3)] max-checkout:basis-[calc((100%_-_1.5rem)/2)] max-compact:basis-full flex min-w-0 flex-col overflow-hidden rounded-lg border border-stroke bg-panel">
-    <div class="relative">
-      <img
-        :src="`${assetBase}products/${product.image}`"
-        :alt="product.name"
-        width="400"
-        height="300"
-        class="aspect-[4/3] w-full object-cover"
-      />
-    </div>
-    <div class="flex flex-1 flex-col p-5">
-      <h2 class="text-base font-semibold">{{ product.name }}</h2>
-      <p class="mt-2 text-xs leading-relaxed text-muted">{{ product.description }}</p>
-      <p class="mt-4 text-xl font-medium tracking-tight">{{ currency(product.price) }}</p>
-      <button
-        type="button"
+      <ProductCard
+        v-for="product in catalog.items"
+        :key="product.id"
+        :product="product"
+        :cart-quantity="cartQuantities.get(product.id) ?? 0"
         :disabled="cartStore.locked"
-        class="mt-5 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-md border border-action bg-action px-4 py-3 text-sm font-medium text-inset transition-colors hover:border-action-hover hover:bg-action-hover disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none"
-        @click="addProduct(product)"
-      >
-        <StoreIcon name="bag" :size="18" />Adicionar ao carrinho
-      </button>
-    </div>
-  </article>
+        class="basis-[calc((100%_-_3rem)/3)] max-checkout:basis-[calc((100%_-_1.5rem)/2)] max-compact:basis-full"
+        @add="addProduct"
+      />
     </div>
   </main>
 </template>
