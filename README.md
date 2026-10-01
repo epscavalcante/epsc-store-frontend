@@ -18,6 +18,8 @@ Configuração em `.env.example`:
 
 Em produção, configure o servidor para encaminhar `/api` ao backend ou use `VITE_API_URL` com a URL pública da API e habilite CORS no backend. O servidor também deve encaminhar as rotas do frontend para `index.html`.
 
+No GitHub Pages, o workflow usa a variável de Actions `VITE_API_URL` do repositório ou do environment `github-pages` durante o build. Configure a URL pública completa da API, incluindo o prefixo somente se o backend usar um. O build falha se a variável estiver vazia.
+
 ## Organização
 
 - `src/api/HttpClient.ts`: transporte com fetch, timeout e erros HTTP.
