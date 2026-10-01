@@ -3,14 +3,14 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { PaymentMethod } from '@/checkout/types'
 import StoreIcon from './StoreIcon.vue'
 
-defineProps<{ method: PaymentMethod }>()
+const props = defineProps<{ method: PaymentMethod; expiresAt: number; dueAt: number }>()
 const assetBase = import.meta.env.BASE_URL
 // Deliberately non-payable examples. The QR encodes this same demonstration text.
 const pixCode = 'DEMO-EPSC-STORE-PIX-SEM-VALOR-NAO-PAGAR'
 const boletoCode = '00000.00000 00000.000000 00000.000000 0 00000000000000'
-const expiresAt = Date.now() + 30 * 60 * 1000
-const dueDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')
-const remaining = ref(30 * 60)
+const dueDate = computed(() => new Date(props.dueAt).toLocaleDateString('pt-BR'))
+const now = ref(Date.now())
+const remaining = computed(() => Math.max(0, Math.ceil((props.expiresAt - now.value) / 1000)))
 const copied = ref<'pix' | 'boleto' | null>(null)
 const copyError = ref('')
 const timeLeft = computed(
@@ -21,7 +21,7 @@ let interval: ReturnType<typeof setInterval> | undefined
 let feedbackTimeout: ReturnType<typeof setTimeout> | undefined
 onMounted(() => {
   interval = setInterval(() => {
-    remaining.value = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000))
+    now.value = Date.now()
     if (!remaining.value) clearInterval(interval)
   }, 1000)
 })

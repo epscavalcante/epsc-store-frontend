@@ -1,11 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { CartItem } from '@/checkout/types'
 import { currency } from '@/checkout/types'
 import { cartTotal } from '@/checkout/service'
 import StoreIcon from './StoreIcon.vue'
-defineProps<{ items: CartItem[]; disabled?: boolean; readonly?: boolean }>()
-defineEmits<{ quantity: [productId: number, change: number] }>()
+const props = defineProps<{
+  items: CartItem[]
+  total?: number
+  disabled?: boolean
+  readonly?: boolean
+}>()
+defineEmits<{ quantity: [productId: number, change: number]; remove: [productId: number] }>()
 const assetBase = import.meta.env.BASE_URL
+const itemCount = computed(() => props.items.reduce((count, item) => count + item.quantity, 0))
+const total = computed(() => props.total ?? cartTotal(props.items))
 </script>
 <template>
   <aside
@@ -16,7 +24,7 @@ const assetBase = import.meta.env.BASE_URL
       class="mb-8 flex items-center justify-between gap-3 max-checkout:mb-[25px] [&>span]:text-xs [&>span]:whitespace-nowrap [&>span]:text-muted"
     >
       <h2 class="text-[17px] font-[650] tracking-[-.25px]" id="summary-title">Resumo do pedido</h2>
-      <span>{{ items.length }} produtos</span>
+      <span aria-live="polite">{{ itemCount }} {{ itemCount === 1 ? 'item' : 'itens' }}</span>
     </div>
     <div class="mb-[22px] border-b border-stroke">
       <article
@@ -61,19 +69,31 @@ const assetBase = import.meta.env.BASE_URL
               +
             </button>
           </div>
-          <span v-else class="mt-[3px] block text-[10px] text-muted"
+          <button
+            v-if="!readonly"
+            type="button"
+            :disabled="disabled"
+            :aria-label="`Remover ${item.product.name} do carrinho`"
+            class="mt-2 block text-[10px] text-muted underline underline-offset-2 disabled:opacity-50"
+            @click="$emit('remove', item.product.id)"
+          >
+            Remover
+          </button>
+          <span v-if="readonly" class="mt-[3px] block text-[10px] text-muted"
             >Quantidade: {{ item.quantity }}</span
           >
         </div>
-        <strong class="self-center text-xs font-normal whitespace-nowrap max-narrow:text-[11px]">{{
-          currency(item.product.price * item.quantity)
-        }}</strong>
+        <strong
+          class="self-center text-xs font-normal whitespace-nowrap max-narrow:text-[11px]"
+          aria-live="polite"
+          >{{ currency(item.product.price * item.quantity) }}</strong
+        >
       </article>
     </div>
     <div
       class="my-[17px] flex justify-between text-xs text-muted [&>span:last-child]:text-foreground"
     >
-      <span>Subtotal</span><span>{{ currency(cartTotal(items)) }}</span>
+      <span>Subtotal</span><span>{{ currency(total) }}</span>
     </div>
     <div
       class="my-[17px] flex justify-between text-xs text-muted [&>span:last-child]:text-foreground"
@@ -84,12 +104,12 @@ const assetBase = import.meta.env.BASE_URL
       class="mt-[27px] flex items-center justify-between gap-2.5 border-t border-stroke pt-[23px] [&>div]:flex [&>div]:items-baseline [&>div]:gap-[5px] [&_strong]:text-[17px] [&_strong]:font-semibold [&>strong]:text-[25px] [&>strong]:font-normal [&>strong]:tracking-[-.8px] [&_small]:text-[10px] [&_small]:text-muted"
     >
       <div><strong>Total</strong><small>BRL</small></div>
-      <strong>{{ currency(cartTotal(items)) }}</strong>
+      <strong aria-live="polite" aria-atomic="true">{{ currency(total) }}</strong>
     </div>
     <p
       class="mt-[34px] flex items-start gap-2 text-[10px] leading-[1.7] text-subtle [&_svg]:shrink-0"
     >
-      <StoreIcon name="bag" :size="17" /> Produtos selecionados para esta compra de teste.
+      <StoreIcon name="bag" :size="17" /> Produtos da sua compra de teste.
     </p>
   </aside>
 </template>

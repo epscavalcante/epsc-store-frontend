@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineProps<{ name: string; size?: number }>()
 const paths: Record<string, string> = {
+  cart: 'M3 3h2l3 12h10l3-9H6M10 20a1 1 0 1 1-2 0 1 1 0 0 1 2 0m9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0',
   bag: 'M6 7h12l1 13H5L6 7Zm3 0V5a3 3 0 0 1 6 0v2',
   lock: 'M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5V10Zm7 5v2',
   card: 'M3 5h18v14H3V5Zm0 5h18M7 15h4',
