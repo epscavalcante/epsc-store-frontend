@@ -1,11 +1,30 @@
 import { reactive } from 'vue'
-import type { PaymentMethod } from './types'
+import type { PaymentFields, PaymentMethod } from './types'
+export const emptyPaymentFields = (): PaymentFields => ({
+  name: '',
+  taxId: '',
+  email: '',
+  phone: '',
+  postalCode: '',
+  addressNumber: '',
+  holderName: '',
+  cardNumber: '',
+  expiryMonth: '',
+  expiryYear: '',
+  ccv: '',
+})
 export const checkoutDraft = reactive({
   method: 'pix' as PaymentMethod,
-  fields: { name: '', taxId: '' },
+  fields: emptyPaymentFields(),
 })
+export function resetCreditCardDraft() {
+  checkoutDraft.fields.holderName = ''
+  checkoutDraft.fields.cardNumber = ''
+  checkoutDraft.fields.expiryMonth = ''
+  checkoutDraft.fields.expiryYear = ''
+  checkoutDraft.fields.ccv = ''
+}
 export function resetPaymentDraft() {
   checkoutDraft.method = 'pix'
-  checkoutDraft.fields.name = ''
-  checkoutDraft.fields.taxId = ''
+  Object.assign(checkoutDraft.fields, emptyPaymentFields())
 }

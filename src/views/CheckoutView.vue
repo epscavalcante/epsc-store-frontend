@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, toRefs } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, toRefs } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useCartStore } from '@/stores/cart'
 import { useProductsStore } from '@/stores/products'
 import { useCheckout } from '@/composables/useCheckout'
-import { checkoutDraft, resetPaymentDraft } from '@/checkout/draft'
+import { checkoutDraft, resetCreditCardDraft, resetPaymentDraft } from '@/checkout/draft'
 import { checkoutRequest } from '@/checkout/service'
 import { validatePayment } from '@/checkout/validation'
 import { recentOrderIds } from '@/checkout/orders'
 import type { FieldErrors } from '@/checkout/types'
+import { currency } from '@/checkout/types'
 import OrderSummary from '@/components/OrderSummary.vue'
 import StoreIcon from '@/components/StoreIcon.vue'
 
@@ -23,10 +24,105 @@ const form = ref<HTMLFormElement>()
 const methods = [
   { id: 'pix' as const, label: 'Pix', icon: 'pix' },
   { id: 'bankslip' as const, label: 'Boleto', icon: 'barcode' },
+  { id: 'credit_card' as const, label: 'Cartão de crédito', icon: 'card' },
 ]
+const customerInputs = [
+  {
+    key: 'email',
+    label: 'E-mail',
+    type: 'email',
+    inputmode: 'email',
+    autocomplete: 'email',
+    maxlength: 254,
+    placeholder: 'voce@exemplo.com',
+    fullWidth: true,
+  },
+  {
+    key: 'phone',
+    label: 'Telefone com DDD',
+    type: 'tel',
+    inputmode: 'tel',
+    autocomplete: 'tel-national',
+    maxlength: 15,
+    placeholder: '(65) 99999-9999',
+    fullWidth: true,
+  },
+  {
+    key: 'postalCode',
+    label: 'CEP',
+    type: 'text',
+    inputmode: 'numeric',
+    autocomplete: 'postal-code',
+    maxlength: 9,
+    placeholder: '00000-000',
+    fullWidth: false,
+  },
+  {
+    key: 'addressNumber',
+    label: 'Número do endereço',
+    type: 'text',
+    inputmode: 'text',
+    autocomplete: 'off',
+    placeholder: '123 ou S/N',
+    fullWidth: false,
+  },
+] as const
+const cardInputs = [
+  {
+    key: 'cardNumber',
+    label: 'Número do cartão',
+    type: 'text',
+    inputmode: 'numeric',
+    autocomplete: 'cc-number',
+    maxlength: 23,
+    placeholder: '0000 0000 0000 0000',
+    fullWidth: true,
+  },
+  {
+    key: 'holderName',
+    label: 'Nome impresso no cartão',
+    type: 'text',
+    inputmode: 'text',
+    autocomplete: 'cc-name',
+    maxlength: 100,
+    placeholder: 'Nome do titular',
+    fullWidth: true,
+  },
+  {
+    key: 'expiryMonth',
+    label: 'Mês de validade',
+    type: 'text',
+    inputmode: 'numeric',
+    autocomplete: 'cc-exp-month',
+    maxlength: 2,
+    placeholder: 'MM',
+    fullWidth: false,
+  },
+  {
+    key: 'expiryYear',
+    label: 'Ano de validade',
+    type: 'text',
+    inputmode: 'numeric',
+    autocomplete: 'cc-exp-year',
+    maxlength: 4,
+    placeholder: 'AAAA',
+    fullWidth: false,
+  },
+  {
+    key: 'ccv',
+    label: 'CVV',
+    type: 'password',
+    inputmode: 'numeric',
+    autocomplete: 'cc-csc',
+    maxlength: 4,
+    placeholder: '3 ou 4 dígitos',
+    fullWidth: false,
+  },
+] as const
 onMounted(() => {
   void catalog.load()
 })
+onUnmounted(resetCreditCardDraft)
 function changeQuantity(id: string, change: number) {
   if (change > 0) cartStore.increaseQuantity(id)
   else cartStore.decreaseQuantity(id)
@@ -42,9 +138,7 @@ async function submit() {
   cartStore.locked = true
   try {
     const paymentMethod = method.value
-    const result = await create(
-      checkoutRequest(paymentMethod, cartStore.items, fields.value.name, fields.value.taxId),
-    )
+    const result = await create(checkoutRequest(paymentMethod, cartStore.items, fields.value))
     if (!result) {
       errors.value = fieldErrors.value
       return
@@ -53,19 +147,30 @@ async function submit() {
     resetPaymentDraft()
     await router.push({ name: 'order', params: { id: result.id } })
     if (result.status === 'pending') {
-      toast.info('Pedido criado. Falta realizar o pagamento.', {
-        id: `checkout-${result.id}`,
-        duration: 8000,
-        description:
-          paymentMethod === 'pix'
-            ? 'Escaneie o QR Code ou copie o código Pix para pagar antes do prazo de expiração.'
-            : 'Copie o código de barras ou abra o boleto para pagar até o vencimento.',
-      })
+      toast.info(
+        paymentMethod === 'credit_card'
+          ? 'Pedido criado. Aguardando confirmação do cartão.'
+          : 'Pedido criado. Falta realizar o pagamento.',
+        {
+          id: `checkout-${result.id}`,
+          duration: 8000,
+          description:
+            paymentMethod === 'pix'
+              ? 'Escaneie o QR Code ou copie o código Pix para pagar antes do prazo de expiração.'
+              : paymentMethod === 'bankslip'
+                ? 'Copie o código de barras ou abra o boleto para pagar até o vencimento.'
+                : 'O pagamento foi enviado. A confirmação será atualizada na página do pedido.',
+        },
+      )
     } else {
       toast.success('Pedido criado.', { id: `checkout-${result.id}` })
     }
   } finally {
     cartStore.locked = false
+    if (Object.keys(errors.value).length) {
+      await nextTick()
+      form.value?.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus()
+    }
   }
 }
 </script>
@@ -106,7 +211,10 @@ async function submit() {
         >
         <h2 class="mb-4 text-[17px] font-semibold">Forma de pagamento</h2>
         <form ref="form" novalidate :aria-busy="creating" @submit.prevent="submit">
-          <fieldset class="grid grid-cols-2 gap-3" :disabled="cartStore.locked">
+          <fieldset
+            class="grid grid-cols-3 gap-3 max-narrow:grid-cols-1"
+            :disabled="cartStore.locked"
+          >
             <legend class="sr-only">Método de pagamento</legend>
             <label
               v-for="option in methods"
@@ -142,9 +250,13 @@ async function submit() {
             </p>
           </div>
           <fieldset v-else class="my-6 space-y-3" :disabled="cartStore.locked">
-            <legend class="sr-only">Dados para boleto</legend>
+            <legend class="sr-only">Dados do cliente</legend>
             <p class="text-xs leading-relaxed text-muted">
-              Informe os dados necessários para emitir o boleto.
+              {{
+                method === 'bankslip'
+                  ? 'Informe os dados necessários para emitir o boleto.'
+                  : 'Informe os dados do cliente necessários para o pagamento com cartão.'
+              }}
             </p>
             <div>
               <label for="customer-name" class="mb-2 block text-xs font-medium"
@@ -180,6 +292,75 @@ async function submit() {
               <p v-if="errors.taxId" id="tax-error" class="mt-2 text-xs text-danger">
                 {{ errors.taxId }}
               </p>
+            </div>
+            <div v-if="method === 'credit_card'" class="grid grid-cols-2 gap-3">
+              <div
+                v-for="input in customerInputs"
+                :key="input.key"
+                class="min-w-0"
+                :class="{ 'col-span-2': input.fullWidth }"
+              >
+                <label :for="`customer-${input.key}`" class="mb-2 block text-xs font-medium">{{
+                  input.label
+                }}</label>
+                <input
+                  :id="`customer-${input.key}`"
+                  v-model="fields[input.key]"
+                  :type="input.type"
+                  :inputmode="input.inputmode"
+                  :autocomplete="input.autocomplete"
+                  :maxlength="'maxlength' in input ? input.maxlength : undefined"
+                  :placeholder="input.placeholder"
+                  :aria-invalid="!!errors[input.key]"
+                  :aria-describedby="errors[input.key] ? `${input.key}-error` : undefined"
+                  class="w-full rounded-field border border-stroke-input bg-control p-3 text-sm aria-invalid:border-danger-border"
+                />
+                <p
+                  v-if="errors[input.key]"
+                  :id="`${input.key}-error`"
+                  class="mt-2 text-xs text-danger"
+                >
+                  {{ errors[input.key] }}
+                </p>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset v-if="method === 'credit_card'" class="my-6" :disabled="cartStore.locked">
+            <legend class="mb-3 text-sm font-semibold">Dados do cartão</legend>
+            <p class="mb-4 text-xs leading-relaxed text-muted">
+              Pagamento em uma única cobrança de {{ currency(cartStore.subtotal) }}.
+            </p>
+            <div class="grid grid-cols-3 gap-3">
+              <div
+                v-for="input in cardInputs"
+                :key="input.key"
+                class="min-w-0"
+                :class="{ 'col-span-3': input.fullWidth }"
+              >
+                <label :for="`card-${input.key}`" class="mb-2 block text-xs font-medium">{{
+                  input.label
+                }}</label>
+                <input
+                  :id="`card-${input.key}`"
+                  v-model="fields[input.key]"
+                  :type="input.type"
+                  :inputmode="input.inputmode"
+                  :autocomplete="input.autocomplete"
+                  :maxlength="input.maxlength"
+                  :placeholder="input.placeholder"
+                  :spellcheck="false"
+                  :aria-invalid="!!errors[input.key]"
+                  :aria-describedby="errors[input.key] ? `${input.key}-error` : undefined"
+                  class="w-full rounded-field border border-stroke-input bg-control p-3 text-sm aria-invalid:border-danger-border"
+                />
+                <p
+                  v-if="errors[input.key]"
+                  :id="`${input.key}-error`"
+                  class="mt-2 text-xs text-danger"
+                >
+                  {{ errors[input.key] }}
+                </p>
+              </div>
             </div>
           </fieldset>
           <p v-if="error" role="alert" class="mb-4 text-xs leading-relaxed text-danger">

@@ -68,7 +68,9 @@ async function copyCode() {
           ? 'Pagamento com Pix'
           : payment.method === 'bankslip'
             ? 'Pagamento com boleto'
-            : 'Pagamento'
+            : payment.method === 'credit_card'
+              ? 'Pagamento com cartão de crédito'
+              : 'Pagamento'
       }}
     </h2>
     <p v-if="unavailable" class="mt-3 text-xs text-pending">
@@ -78,10 +80,17 @@ async function copyCode() {
           : `Status do pagamento: ${payment.rawStatus}.`
       }}
     </p>
+    <p
+      v-if="payment.method === 'credit_card' && !unavailable"
+      class="mt-3 text-xs leading-relaxed text-muted"
+    >
+      O pagamento foi enviado e está aguardando confirmação. O status será atualizado
+      automaticamente.
+    </p>
     <template v-if="payment.method === 'pix'">
       <div
         v-if="payment.pixImage && !imageFailed"
-        class="mx-auto my-5 w-[196px] rounded-lg bg-white p-3"
+        class="mx-auto my-5 w-48 rounded-lg bg-white p-3"
         :class="{ 'opacity-30': unavailable }"
       >
         <img
@@ -89,7 +98,7 @@ async function copyCode() {
           alt="QR Code do pagamento Pix"
           width="172"
           height="172"
-          class="size-[172px]"
+          class="size-44"
           @error="imageFailed = true"
         />
       </div>
@@ -107,10 +116,7 @@ async function copyCode() {
       {{ payment.method === 'bankslip' ? 'Vencimento' : 'Validade' }}: {{ expiryDate }}
     </p>
     <template v-if="code">
-      <BoletoBarcode
-        v-if="payment.method === 'bankslip' && !unavailable"
-        :value="code"
-      />
+      <BoletoBarcode v-if="payment.method === 'bankslip' && !unavailable" :value="code" />
       <template v-if="payment.method === 'pix'">
         <label :for="`payment-code-${payment.id}`" class="mt-4 mb-2 block text-xs">
           Pix copia e cola
@@ -136,7 +142,12 @@ async function copyCode() {
         <StoreIcon :name="payment.method === 'pix' ? 'pix' : 'barcode'" :size="16" />Copiar código
       </button>
     </template>
-    <p v-else class="mt-4 text-xs text-muted">Código de pagamento ainda não disponível.</p>
+    <p
+      v-else-if="payment.method === 'pix' || payment.method === 'bankslip'"
+      class="mt-4 text-xs text-muted"
+    >
+      Código de pagamento ainda não disponível.
+    </p>
     <a
       v-if="payment.method === 'bankslip' && safeBoletoUrl && !unavailable"
       :href="safeBoletoUrl"

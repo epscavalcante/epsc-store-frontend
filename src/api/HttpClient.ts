@@ -25,7 +25,8 @@ export class FetchHttpClient implements HttpClient {
         },
         signal: options.signal
           ? AbortSignal.any([options.signal, AbortSignal.timeout(20000)])
-          : AbortSignal.timeout(options.method === 'POST' ? 45000 : 20000),
+          : // Credit card checkout can take up to 30s for the customer plus 60s for the payment.
+            AbortSignal.timeout(options.method === 'POST' ? 105000 : 20000),
       })
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') throw error

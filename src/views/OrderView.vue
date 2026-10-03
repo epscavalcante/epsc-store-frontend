@@ -21,7 +21,9 @@ const heading = computed(() => {
     case 'success':
       return 'Pagamento confirmado!'
     case 'pending':
-      return 'Aguardando pagamento'
+      return order.value.payments.some((payment) => payment.method === 'credit_card')
+        ? 'Aguardando confirmação do pagamento'
+        : 'Aguardando pagamento'
     case 'error':
       return 'Pagamento não concluído'
     case 'expired':
@@ -91,7 +93,9 @@ async function rebuildCart() {
           order.status === 'success'
             ? 'O pagamento foi confirmado pelo servidor.'
             : order.status === 'pending'
-              ? 'Seu pedido foi criado. Consulte as instruções abaixo para pagar quando quiser.'
+              ? order.payments.some((payment) => payment.method === 'credit_card')
+                ? 'Seu pedido foi criado. O pagamento com cartão está aguardando confirmação.'
+                : 'Seu pedido foi criado. Consulte as instruções abaixo para realizar o pagamento.'
               : `Status informado pelo servidor: ${order.rawStatus}.`
         }}
       </p>

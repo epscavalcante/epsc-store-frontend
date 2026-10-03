@@ -1,4 +1,7 @@
-export type PaymentMethod = 'pix' | 'bankslip'
+import type { z } from 'zod'
+import type { creditCardPaymentSchema, paymentSchemas } from './schemas'
+
+export type PaymentMethod = keyof typeof paymentSchemas
 export type CheckoutStatus = 'success' | 'error' | 'pending' | 'expired' | 'cancelled' | 'unknown'
 
 // Prices are represented in cents in the UI to avoid rounding errors.
@@ -13,11 +16,34 @@ export interface CartItem {
   product: Product
   quantity: number
 }
-export interface CheckoutRequest {
-  payment_method: PaymentMethod
+interface CheckoutItems {
   items: { product_id: string; quantity: number }[]
-  customer?: { name: string; tax_id: string }
 }
+interface CheckoutCustomer {
+  name: string
+  tax_id: string
+}
+export type CheckoutRequest = CheckoutItems &
+  (
+    | { payment_method: 'pix' }
+    | { payment_method: 'bankslip'; customer: CheckoutCustomer }
+    | {
+        payment_method: 'credit_card'
+        customer: CheckoutCustomer & {
+          email: string
+          phone: string
+          postal_code: string
+          address_number: string
+        }
+        credit_card: {
+          holder_name: string
+          number: string
+          expiry_month: string
+          expiry_year: string
+          ccv: string
+        }
+      }
+  )
 export interface CheckoutResult {
   id: string
   status: CheckoutStatus
@@ -39,10 +65,7 @@ export interface CheckoutPayment {
   bankslipUrl: string | null
   createdAt: number | null
 }
-export interface PaymentFields {
-  name: string
-  taxId: string
-}
+export type PaymentFields = z.input<typeof creditCardPaymentSchema>
 export type FieldErrors = Partial<Record<keyof PaymentFields, string>>
 export const currency = (cents: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100)

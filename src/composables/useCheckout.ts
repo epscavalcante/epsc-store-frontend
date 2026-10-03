@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { ApiError } from '@/api/HttpClient'
 import { checkoutGatewayKey, injectRequired } from '@/config/injectionKeys'
 import { rememberOrder } from '@/checkout/orders'
+import { paymentFieldErrors } from '@/checkout/validation'
 import type { CheckoutRequest, CheckoutResult, FieldErrors } from '@/checkout/types'
 
 export function useCheckout() {
@@ -76,19 +77,20 @@ export function useCheckout() {
       rememberOrder(result.id)
       return result
     } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 422 && Array.isArray(cause.detail)) {
-        for (const issue of cause.detail as { loc?: unknown[] }[]) {
-          const field = issue.loc?.at(-1)
-          if (field === 'name') fieldErrors.value.name = 'Verifique o nome informado.'
-          if (field === 'tax_id') fieldErrors.value.taxId = 'Verifique o CPF ou CNPJ informado.'
-        }
-      }
+      if (cause instanceof ApiError && cause.status === 422)
+        fieldErrors.value = paymentFieldErrors(cause.detail)
       error.value =
-        cause instanceof ApiError && cause.status === 0
-          ? 'Não foi possível confirmar a criação do pedido. Não houve reenvio automático. Verifique a conexão antes de tentar novamente.'
-          : cause instanceof Error
-            ? cause.message
-            : 'Não foi possível criar o pedido.'
+        cause instanceof ApiError && cause.status === 504
+          ? 'O processamento demorou além do esperado. Não houve reenvio automático. Confira o pagamento com a operadora antes de tentar novamente.'
+          : cause instanceof ApiError && cause.status === 0
+            ? 'Não foi possível confirmar a criação do pedido. Não houve reenvio automático. Verifique a conexão antes de tentar novamente.'
+            : cause instanceof ApiError &&
+                request.payment_method === 'credit_card' &&
+                cause.status === 400
+              ? 'Os dados do cliente ou do cartão foram recusados. Verifique os campos informados.'
+              : cause instanceof Error
+                ? cause.message
+                : 'Não foi possível criar o pedido.'
       if (!disposed) {
         toast.error('Não foi possível finalizar o pedido.', {
           id: 'checkout-create-error',
