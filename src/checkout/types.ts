@@ -25,7 +25,7 @@ interface CheckoutCustomer {
 }
 export type CheckoutRequest = CheckoutItems &
   (
-    | { payment_method: 'pix' }
+    | { payment_method: 'pix'; customer: CheckoutCustomer }
     | { payment_method: 'bankslip'; customer: CheckoutCustomer }
     | {
         payment_method: 'credit_card'

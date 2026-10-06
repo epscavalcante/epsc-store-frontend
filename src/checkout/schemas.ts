@@ -37,6 +37,18 @@ export const customerPaymentSchema = z.object({
     .transform((value) => value.replace(/\D/g, '')),
 })
 
+export const pixPaymentSchema = customerPaymentSchema.extend({
+  name: name('Informe seu nome completo (de 2 a 100 caracteres).'),
+  taxId: z
+    .string()
+    .trim()
+    .refine(
+      (value) => /^(\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})$/.test(value) && validTaxId(value),
+      'Informe um CPF válido.',
+    )
+    .transform((value) => value.replace(/\D/g, '')),
+})
+
 export const creditCardPaymentSchema = customerPaymentSchema
   .extend({
     email: z
@@ -83,7 +95,7 @@ export const creditCardPaymentSchema = customerPaymentSchema
   })
 
 export const paymentSchemas = {
-  pix: z.object({}),
+  pix: pixPaymentSchema,
   bankslip: customerPaymentSchema,
   credit_card: creditCardPaymentSchema,
 }

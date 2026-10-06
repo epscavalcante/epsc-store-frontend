@@ -249,24 +249,27 @@ async function submit() {
               página do pedido.
             </p>
           </div>
-          <fieldset v-else class="my-6 space-y-3" :disabled="cartStore.locked">
+          <fieldset class="my-6 space-y-3" :disabled="cartStore.locked">
             <legend class="sr-only">Dados do cliente</legend>
             <p class="text-xs leading-relaxed text-muted">
               {{
-                method === 'bankslip'
-                  ? 'Informe os dados necessários para emitir o boleto.'
-                  : 'Informe os dados do cliente necessários para o pagamento com cartão.'
+                method === 'pix'
+                  ? 'Informe seu nome e CPF para pagar com Pix.'
+                  : method === 'bankslip'
+                    ? 'Informe os dados necessários para emitir o boleto.'
+                    : 'Informe os dados do cliente necessários para o pagamento com cartão.'
               }}
             </p>
             <div>
-              <label for="customer-name" class="mb-2 block text-xs font-medium"
-                >Nome completo ou razão social</label
-              >
+              <label for="customer-name" class="mb-2 block text-xs font-medium">{{
+                method === 'pix' ? 'Nome completo' : 'Nome completo ou razão social'
+              }}</label>
               <input
                 id="customer-name"
                 v-model="fields.name"
                 maxlength="100"
                 autocomplete="name"
+                required
                 :aria-invalid="!!errors.name"
                 :aria-describedby="errors.name ? 'name-error' : undefined"
                 class="w-full rounded-field border border-stroke-input bg-control p-3 text-sm aria-invalid:border-danger-border"
@@ -277,13 +280,16 @@ async function submit() {
               </p>
             </div>
             <div>
-              <label for="tax-id" class="mb-2 block text-xs font-medium">CPF ou CNPJ</label>
+              <label for="tax-id" class="mb-2 block text-xs font-medium">{{
+                method === 'pix' ? 'CPF' : 'CPF ou CNPJ'
+              }}</label>
               <input
                 id="tax-id"
                 v-model="fields.taxId"
-                maxlength="18"
+                :maxlength="method === 'pix' ? 14 : 18"
                 inputmode="numeric"
                 autocomplete="off"
+                required
                 :aria-invalid="!!errors.taxId"
                 :aria-describedby="errors.taxId ? 'tax-error' : undefined"
                 class="w-full rounded-field border border-stroke-input bg-control p-3 text-sm aria-invalid:border-danger-border"
