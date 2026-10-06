@@ -37,6 +37,8 @@ UUIDs do backend identificam os produtos. Valores recebidos em reais são conver
 
 A Home `/` busca os produtos reais. O checkout `/checkout` usa os itens da Pinia, permite alterar quantidades e remover produtos. Aceita Pix, boleto e cartão de crédito, conforme o contrato do backend. O cartão é pago em uma única cobrança, sem parcelamento.
 
+Para Pix, o formulário solicita apenas nome e CPF; para boleto, nome ou razão social e CPF/CNPJ. Os dados são validados antes da criação do pedido e enviados em `customer.name` e `customer.tax_id`, com o nome sem espaços nas extremidades e o documento sem pontuação. Pix não exige nem envia dados de contato, endereço ou cartão. Os campos preenchidos são preservados ao alternar o método de pagamento.
+
 Para cartão, o formulário valida os dados do cliente (nome, CPF/CNPJ, e-mail, telefone com DDD, CEP e número do endereço) e envia `credit_card` com `holder_name`, `number`, `expiry_month`, `expiry_year` e `ccv`. Número, telefone, CEP e documento são enviados sem formatação; mês, ano e CVV permanecem strings para preservar zeros à esquerda. A validade aceita o mês atual e rejeita cartões vencidos. O backend determina o IP do cliente. A confirmação do cartão depende do status retornado pela API; um pedido pendente continua aguardando confirmação.
 
 Após criar o checkout, o carrinho é limpo e a interface abre `/pedidos/:id`. Os itens e pagamentos são consultados na API. Pix usa o código e imagem de QR retornados; boleto usa o código e link fornecidos pelo backend. Campos indisponíveis não recebem exemplos fictícios. Expiração vem do backend e não reinicia ao atualizar ou reabrir a página.
