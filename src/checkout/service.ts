@@ -13,7 +13,7 @@ export function checkoutRequest(
     return {
       payment_method: method,
       items: checkoutItems,
-      customer: { name: parsed.name, tax_id: parsed.taxId },
+      customer: { name: parsed.name, tax_id: parsed.taxId, email: parsed.email },
     }
   }
   const parsed = paymentSchemas.credit_card.parse(fields)
