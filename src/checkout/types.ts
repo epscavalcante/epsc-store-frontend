@@ -22,6 +22,7 @@ interface CheckoutItems {
 interface CheckoutCustomer {
   name: string
   tax_id: string
+  email: string
 }
 export type CheckoutRequest = CheckoutItems &
   (
@@ -30,7 +31,6 @@ export type CheckoutRequest = CheckoutItems &
     | {
         payment_method: 'credit_card'
         customer: CheckoutCustomer & {
-          email: string
           phone: string
           postal_code: string
           address_number: string

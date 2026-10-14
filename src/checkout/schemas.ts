@@ -30,6 +30,11 @@ const digits = (format: RegExp, length: RegExp, message: string) =>
 
 export const customerPaymentSchema = z.object({
   name: name('Informe seu nome completo ou razão social (de 2 a 100 caracteres).'),
+  email: z
+      .string()
+      .trim()
+      .max(254, 'Informe um e-mail válido.')
+      .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'Informe um e-mail válido.'),
   taxId: z
     .string()
     .trim()
@@ -37,25 +42,8 @@ export const customerPaymentSchema = z.object({
     .transform((value) => value.replace(/\D/g, '')),
 })
 
-export const pixPaymentSchema = customerPaymentSchema.extend({
-  name: name('Informe seu nome completo (de 2 a 100 caracteres).'),
-  taxId: z
-    .string()
-    .trim()
-    .refine(
-      (value) => /^(\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})$/.test(value) && validTaxId(value),
-      'Informe um CPF válido.',
-    )
-    .transform((value) => value.replace(/\D/g, '')),
-})
-
 export const creditCardPaymentSchema = customerPaymentSchema
   .extend({
-    email: z
-      .string()
-      .trim()
-      .max(254, 'Informe um e-mail válido.')
-      .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'Informe um e-mail válido.'),
     phone: digits(/^[\d\s()-]+$/, /^\d{10,11}$/, 'Informe um telefone com DDD (10 ou 11 dígitos).'),
     postalCode: digits(/^[\d\s-]+$/, /^\d{8}$/, 'Informe um CEP com 8 dígitos.'),
     addressNumber: z.string().trim().min(1, 'Informe o número do endereço.'),
@@ -95,7 +83,7 @@ export const creditCardPaymentSchema = customerPaymentSchema
   })
 
 export const paymentSchemas = {
-  pix: pixPaymentSchema,
+  pix: customerPaymentSchema,
   bankslip: customerPaymentSchema,
   credit_card: creditCardPaymentSchema,
 }
