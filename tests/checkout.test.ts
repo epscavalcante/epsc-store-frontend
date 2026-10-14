@@ -61,22 +61,32 @@ test('serializes a single credit card charge using the backend contract and pres
   })
 })
 
-test('Pix and boleto neither require nor send card or contact fields', () => {
+test('Pix and boleto require customer fields without sending card or address fields', () => {
   const input = fields()
-  const customerOnly = { ...emptyPaymentFields(), name: input.name, taxId: input.taxId }
+  const customerOnly = {
+    ...emptyPaymentFields(),
+    name: input.name,
+    taxId: input.taxId,
+    email: input.email,
+  }
   for (const method of ['pix', 'bankslip'] as const) {
     assert.deepEqual(validatePayment(method, customerOnly), {})
     for (const requestFields of [customerOnly, input])
       assert.deepEqual(checkoutRequest(method, items, requestFields), {
         payment_method: method,
         items: [{ product_id: items[0]!.product.id, quantity: 2 }],
-        customer: { name: 'Cliente Teste', tax_id: '52998224725' },
+        customer: {
+          name: 'Cliente Teste',
+          tax_id: '52998224725',
+          email: 'cliente@example.com',
+        },
       })
   }
 })
 
-test('Pix requires a valid name and CPF before creating a checkout', () => {
+test('Pix requires a valid name, email and CPF or CNPJ before creating a checkout', () => {
   assert.deepEqual(Object.keys(validatePayment('pix', emptyPaymentFields())).sort(), [
+    'email',
     'name',
     'taxId',
   ])
@@ -86,6 +96,11 @@ test('Pix requires a valid name and CPF before creating a checkout', () => {
     assert.ok(validatePayment('pix', input).name)
     assert.throws(() => checkoutRequest('pix', items, input))
   }
+  for (const email of ['', '  ', 'cliente@exemplo', 'cliente@example.com.br inválido']) {
+    const input = { ...fields(), email }
+    assert.ok(validatePayment('pix', input).email, email)
+    assert.throws(() => checkoutRequest('pix', items, input), email)
+  }
   for (const taxId of [
     '',
     '  ',
@@ -93,10 +108,8 @@ test('Pix requires a valid name and CPF before creating a checkout', () => {
     '11111111111',
     '52998224724',
     '529.982.247-24',
-    '52998224725x',
-    '529-982-247-25',
-    '04.252.011/0001-10',
-    '04252011000110',
+    '11111111111111',
+    '04.252.011/0001-11',
   ]) {
     const input = { ...fields(), taxId }
     assert.ok(validatePayment('pix', input).taxId, taxId)
@@ -106,22 +119,29 @@ test('Pix requires a valid name and CPF before creating a checkout', () => {
 
 test('Pix normalizes formatted and unformatted CPF and preserves leading zeros', () => {
   for (const taxId of ['012.345.678-90', '01234567890', ' 012.345.678-90 ']) {
-    const input = { ...emptyPaymentFields(), name: ' Cliente Teste ', taxId }
+    const input = {
+      ...emptyPaymentFields(),
+      name: ' Cliente Teste ',
+      taxId,
+      email: ' cliente@example.com ',
+    }
     assert.deepEqual(validatePayment('pix', input), {})
     assert.deepEqual(checkoutRequest('pix', items, input).customer, {
       name: 'Cliente Teste',
       tax_id: '01234567890',
+      email: 'cliente@example.com',
     })
   }
 })
 
-test('boleto and credit card continue accepting CNPJ', () => {
+test('Pix, boleto and credit card accept and normalize CNPJ', () => {
   const input = { ...fields(), name: ' Empresa Teste ', taxId: '04.252.011/0001-10' }
-  for (const method of ['bankslip', 'credit_card'] as const) {
+  for (const method of ['pix', 'bankslip', 'credit_card'] as const) {
     assert.deepEqual(validatePayment(method, input), {})
     const customer = checkoutRequest(method, items, input).customer
     assert.equal(customer.name, 'Empresa Teste')
     assert.equal(customer.tax_id, '04252011000110')
+    assert.equal(customer.email, 'cliente@example.com')
   }
 })
 
